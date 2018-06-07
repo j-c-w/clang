@@ -60,6 +60,7 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
+#include "llvm/IDL/CustomPasses.hpp"
 #include <memory>
 using namespace clang;
 using namespace llvm;
@@ -348,6 +349,22 @@ static void addSymbolRewriterPass(const CodeGenOptions &Opts,
     MapParser.parse(MapFile, &DL);
 
   MPM->add(createRewriteSymbolsPass(DL));
+}
+
+// My custom research stuff.
+static void addConstraintResearchPasses(const PassManagerBuilder &Builder,
+                                        legacy::PassManagerBase &PM) {
+  PM.add(createResearchFlangfixPass());
+  PM.add(createResearchPreprocessorPass());
+  PM.add(createDeadCodeEliminationPass());
+  PM.add(createLICMPass());
+  PM.add(createEarlyCSEPass());
+  PM.add(createIndVarSimplifyPass());
+  PM.add(createResearchReplacerPass());
+  PM.add(createAggressiveDCEPass());
+  PM.add(createLoopDeletionPass());
+  PM.add(createEarlyCSEPass());
+  PM.add(createCFGSimplificationPass());
 }
 
 static CodeGenOpt::Level getCGOptLevel(const CodeGenOptions &CodeGenOpts) {
@@ -663,6 +680,9 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
   }
   if (CodeGenOpts.hasProfileIRUse())
     PMBuilder.PGOInstrUse = CodeGenOpts.ProfileInstrumentUsePath;
+
+  if (true) PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                                   addConstraintResearchPasses);
 
   if (!CodeGenOpts.SampleProfileFile.empty())
     PMBuilder.PGOSampleUse = CodeGenOpts.SampleProfileFile;
