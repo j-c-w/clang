@@ -202,8 +202,8 @@ public:
   unsigned CCGenDiagnostics : 1;
 
 private:
-  /// Default target triple.
-  std::string DefaultTargetTriple;
+  /// Raw target triple.
+  std::string TargetTriple;
 
   /// Name to use when invoking gcc/g++.
   std::string CCCGenericGCCName;
@@ -256,7 +256,7 @@ private:
   llvm::opt::DerivedArgList *
   TranslateInputArgs(const llvm::opt::InputArgList &Args) const;
 
-  // getFinalPhase - Determine which compilation mode we are in and record 
+  // getFinalPhase - Determine which compilation mode we are in and record
   // which option we used to determine the final phase.
   phases::ID getFinalPhase(const llvm::opt::DerivedArgList &DAL,
                            llvm::opt::Arg **FinalPhaseArg = nullptr) const;
@@ -282,7 +282,7 @@ private:
                               SmallString<128> &CrashDiagDir);
 
 public:
-  Driver(StringRef ClangExecutable, StringRef DefaultTargetTriple,
+  Driver(StringRef ClangExecutable, StringRef TargetTriple,
          DiagnosticsEngine &Diags,
          IntrusiveRefCntPtr<vfs::FileSystem> VFS = nullptr);
 
@@ -308,6 +308,8 @@ public:
 
   const std::string &getTitle() { return DriverTitle; }
   void setTitle(std::string Value) { DriverTitle = std::move(Value); }
+
+  std::string getTargetTriple() const { return TargetTriple; }
 
   /// Get the path to the main clang executable.
   const char *getClangProgramPath() const {
@@ -363,12 +365,12 @@ public:
   llvm::opt::InputArgList ParseArgStrings(ArrayRef<const char *> Args,
                                           bool &ContainsError);
 
-  /// BuildInputs - Construct the list of inputs and their types from 
+  /// BuildInputs - Construct the list of inputs and their types from
   /// the given arguments.
   ///
   /// \param TC - The default host tool chain.
   /// \param Args - The input arguments.
-  /// \param Inputs - The list to store the resulting compilation 
+  /// \param Inputs - The list to store the resulting compilation
   /// inputs onto.
   void BuildInputs(const ToolChain &TC, llvm::opt::DerivedArgList &Args,
                    InputList &Inputs) const;
@@ -491,7 +493,7 @@ public:
   /// \param JA - The action of interest.
   /// \param BaseInput - The original input file that this action was
   /// triggered by.
-  /// \param BoundArch - The bound architecture. 
+  /// \param BoundArch - The bound architecture.
   /// \param AtTopLevel - Whether this is a "top-level" action.
   /// \param MultipleArchs - Whether multiple -arch options were supplied.
   /// \param NormalizedTriple - The normalized triple of the relevant target.
@@ -500,7 +502,7 @@ public:
                                  bool AtTopLevel, bool MultipleArchs,
                                  StringRef NormalizedTriple) const;
 
-  /// GetTemporaryPath - Return the pathname of a temporary file to use 
+  /// GetTemporaryPath - Return the pathname of a temporary file to use
   /// as part of compilation; the file will have the given prefix and suffix.
   ///
   /// GCC goes to extra lengths here to be a bit more robust.

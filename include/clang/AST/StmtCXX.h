@@ -41,8 +41,10 @@ public:
   CXXCatchStmt(EmptyShell Empty)
   : Stmt(CXXCatchStmtClass), ExceptionDecl(nullptr), HandlerBlock(nullptr) {}
 
-  SourceLocation getLocStart() const LLVM_READONLY { return CatchLoc; }
-  SourceLocation getLocEnd() const LLVM_READONLY {
+  SourceLocation getLocStart() const LLVM_READONLY { return getBeginLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return CatchLoc; }
+  SourceLocation getLocEnd() const LLVM_READONLY { return getEndLoc(); }
+  SourceLocation getEndLoc() const LLVM_READONLY {
     return HandlerBlock->getLocEnd();
   }
 
@@ -62,21 +64,22 @@ public:
 
 /// CXXTryStmt - A C++ try block, including all handlers.
 ///
-class CXXTryStmt : public Stmt {
+class CXXTryStmt final : public Stmt,
+                         private llvm::TrailingObjects<CXXTryStmt, Stmt *> {
+
+  friend TrailingObjects;
+  friend class ASTStmtReader;
+
   SourceLocation TryLoc;
   unsigned NumHandlers;
+  size_t numTrailingObjects(OverloadToken<Stmt *>) const { return NumHandlers; }
 
   CXXTryStmt(SourceLocation tryLoc, Stmt *tryBlock, ArrayRef<Stmt*> handlers);
-
   CXXTryStmt(EmptyShell Empty, unsigned numHandlers)
     : Stmt(CXXTryStmtClass), NumHandlers(numHandlers) { }
 
-  Stmt const * const *getStmts() const {
-    return reinterpret_cast<Stmt const * const*>(this + 1);
-  }
-  Stmt **getStmts() {
-    return reinterpret_cast<Stmt **>(this + 1);
-  }
+  Stmt *const *getStmts() const { return getTrailingObjects<Stmt *>(); }
+  Stmt **getStmts() { return getTrailingObjects<Stmt *>(); }
 
 public:
   static CXXTryStmt *Create(const ASTContext &C, SourceLocation tryLoc,
@@ -85,7 +88,8 @@ public:
   static CXXTryStmt *Create(const ASTContext &C, EmptyShell Empty,
                             unsigned numHandlers);
 
-  SourceLocation getLocStart() const LLVM_READONLY { return getTryLoc(); }
+  SourceLocation getLocStart() const LLVM_READONLY { return getBeginLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return getTryLoc(); }
   SourceLocation getLocEnd() const LLVM_READONLY { return getEndLoc(); }
 
   SourceLocation getTryLoc() const { return TryLoc; }
@@ -115,8 +119,6 @@ public:
   child_range children() {
     return child_range(getStmts(), getStmts() + getNumHandlers() + 1);
   }
-
-  friend class ASTStmtReader;
 };
 
 /// CXXForRangeStmt - This represents C++0x [stmt.ranged]'s ranged for
@@ -195,8 +197,10 @@ public:
   SourceLocation getColonLoc() const { return ColonLoc; }
   SourceLocation getRParenLoc() const { return RParenLoc; }
 
-  SourceLocation getLocStart() const LLVM_READONLY { return ForLoc; }
-  SourceLocation getLocEnd() const LLVM_READONLY {
+  SourceLocation getLocStart() const LLVM_READONLY { return getBeginLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return ForLoc; }
+  SourceLocation getLocEnd() const LLVM_READONLY { return getEndLoc(); }
+  SourceLocation getEndLoc() const LLVM_READONLY {
     return SubExprs[BODY]->getLocEnd();
   }
 
@@ -281,8 +285,12 @@ public:
     return reinterpret_cast<CompoundStmt *>(SubStmt);
   }
 
-  SourceLocation getLocStart() const LLVM_READONLY { return KeywordLoc; }
-  SourceLocation getLocEnd() const LLVM_READONLY { return SubStmt->getLocEnd();}
+  SourceLocation getLocStart() const LLVM_READONLY { return getBeginLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return KeywordLoc; }
+  SourceLocation getLocEnd() const LLVM_READONLY { return getEndLoc(); }
+  SourceLocation getEndLoc() const LLVM_READONLY {
+    return SubStmt->getLocEnd();
+  }
 
   child_range children() {
     return child_range(&SubStmt, &SubStmt+1);
@@ -400,11 +408,13 @@ public:
     return {getStoredStmts() + SubStmt::FirstParamMove, NumParams};
   }
 
-  SourceLocation getLocStart() const LLVM_READONLY {
+  SourceLocation getLocStart() const LLVM_READONLY { return getBeginLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY {
     return getBody() ? getBody()->getLocStart()
             : getPromiseDecl()->getLocStart();
   }
-  SourceLocation getLocEnd() const LLVM_READONLY {
+  SourceLocation getLocEnd() const LLVM_READONLY { return getEndLoc(); }
+  SourceLocation getEndLoc() const LLVM_READONLY {
     return getBody() ? getBody()->getLocEnd() : getPromiseDecl()->getLocEnd();
   }
 
@@ -465,8 +475,10 @@ public:
   bool isImplicit() const { return IsImplicit; }
   void setIsImplicit(bool value = true) { IsImplicit = value; }
 
-  SourceLocation getLocStart() const LLVM_READONLY { return CoreturnLoc; }
-  SourceLocation getLocEnd() const LLVM_READONLY {
+  SourceLocation getLocStart() const LLVM_READONLY { return getBeginLoc(); }
+  SourceLocation getBeginLoc() const LLVM_READONLY { return CoreturnLoc; }
+  SourceLocation getLocEnd() const LLVM_READONLY { return getEndLoc(); }
+  SourceLocation getEndLoc() const LLVM_READONLY {
     return getOperand() ? getOperand()->getLocEnd() : getLocStart();
   }
 

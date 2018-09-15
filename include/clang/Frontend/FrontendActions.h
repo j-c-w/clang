@@ -18,7 +18,7 @@ namespace clang {
 
 class Module;
 class FileEntry;
-  
+
 //===----------------------------------------------------------------------===//
 // Custom Consumer Actions
 //===----------------------------------------------------------------------===//
@@ -33,6 +33,18 @@ public:
   // Don't claim to only use the preprocessor, we want to follow the AST path,
   // but do nothing.
   bool usesPreprocessorOnly() const override { return false; }
+};
+
+class DumpCompilerOptionsAction : public FrontendAction {
+  std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI,
+                                                 StringRef InFile) override {
+    return nullptr;
+  }
+
+  void ExecuteAction() override;
+
+public:
+  bool usesPreprocessorOnly() const override { return true; }
 };
 
 //===----------------------------------------------------------------------===//
@@ -186,7 +198,7 @@ protected:
 class ASTMergeAction : public FrontendAction {
   /// The action that the merge action adapts.
   std::unique_ptr<FrontendAction> AdaptedAction;
-  
+
   /// The set of AST files to merge.
   std::vector<std::string> ASTFiles;
 
@@ -221,7 +233,7 @@ protected:
 
   bool usesPreprocessorOnly() const override { return true; }
 };
-  
+
 //===----------------------------------------------------------------------===//
 // Preprocessor Actions
 //===----------------------------------------------------------------------===//
@@ -252,7 +264,7 @@ protected:
 
   bool hasPCHSupport() const override { return true; }
 };
-  
+
 }  // end namespace clang
 
 #endif

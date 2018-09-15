@@ -729,7 +729,7 @@ Decl *TemplateDeclInstantiator::VisitVarDecl(VarDecl *D,
                           DI, D->getStorageClass());
 
   // In ARC, infer 'retaining' for variables of retainable type.
-  if (SemaRef.getLangOpts().ObjCAutoRefCount && 
+  if (SemaRef.getLangOpts().ObjCAutoRefCount &&
       SemaRef.inferObjCARCLifetime(Var))
     Var->setInvalidDecl();
 
@@ -1118,8 +1118,7 @@ void TemplateDeclInstantiator::InstantiateEnumDefinition(
   }
 
   SemaRef.ActOnEnumBody(Enum->getLocation(), Enum->getBraceRange(), Enum,
-                        Enumerators,
-                        nullptr, nullptr);
+                        Enumerators, nullptr, ParsedAttributesView());
 }
 
 Decl *TemplateDeclInstantiator::VisitEnumConstantDecl(EnumConstantDecl *D) {
@@ -2057,7 +2056,7 @@ TemplateDeclInstantiator::VisitCXXMethodDecl(CXXMethodDecl *D,
   // previous declaration we just found.
   if (isFriend && Method->getPreviousDecl())
     Method->setAccess(Method->getPreviousDecl()->getAccess());
-  else 
+  else
     Method->setAccess(D->getAccess());
   if (FunctionTemplate)
     FunctionTemplate->setAccess(Method->getAccess());
@@ -2648,7 +2647,8 @@ Decl *TemplateDeclInstantiator::instantiateUnresolvedUsingDecl(
 
   NamedDecl *UD = SemaRef.BuildUsingDeclaration(
       /*Scope*/ nullptr, D->getAccess(), D->getUsingLoc(),
-      /*HasTypename*/ TD, TypenameLoc, SS, NameInfo, EllipsisLoc, nullptr,
+      /*HasTypename*/ TD, TypenameLoc, SS, NameInfo, EllipsisLoc,
+      ParsedAttributesView(),
       /*IsInstantiation*/ true);
   if (UD)
     SemaRef.Context.setInstantiatedFromUsingDecl(UD, D);
@@ -2833,7 +2833,10 @@ Decl *TemplateDeclInstantiator::VisitFunctionDecl(FunctionDecl *D) {
 
 Decl *
 TemplateDeclInstantiator::VisitCXXDeductionGuideDecl(CXXDeductionGuideDecl *D) {
-  return VisitFunctionDecl(D, nullptr);
+  Decl *Inst = VisitFunctionDecl(D, nullptr);
+  if (Inst && !D->getDescribedFunctionTemplate())
+    Owner->addDecl(Inst);
+  return Inst;
 }
 
 Decl *TemplateDeclInstantiator::VisitCXXMethodDecl(CXXMethodDecl *D) {
@@ -3414,7 +3417,7 @@ TemplateDeclInstantiator::SubstFunctionType(FunctionDecl *D,
     ThisContext = cast<CXXRecordDecl>(Owner);
     ThisTypeQuals = Method->getTypeQualifiers();
   }
-  
+
   TypeSourceInfo *NewTInfo
     = SemaRef.SubstFunctionDeclType(OldTInfo, TemplateArgs,
                                     D->getTypeSpecStartLoc(),
@@ -4221,6 +4224,9 @@ void Sema::InstantiateVariableInitializer(
 
     ActOnUninitializedDecl(Var);
   }
+
+  if (getLangOpts().CUDA)
+    checkAllowedCUDAInitializer(Var);
 }
 
 /// Instantiate the definition of the given variable from its
@@ -4884,14 +4890,14 @@ NamedDecl *Sema::FindInstantiatedDecl(SourceLocation Loc, NamedDecl *D,
                           const MultiLevelTemplateArgumentList &TemplateArgs,
                           bool FindingInstantiatedContext) {
   DeclContext *ParentDC = D->getDeclContext();
-  // FIXME: Parmeters of pointer to functions (y below) that are themselves 
+  // FIXME: Parmeters of pointer to functions (y below) that are themselves
   // parameters (p below) can have their ParentDC set to the translation-unit
-  // - thus we can not consistently check if the ParentDC of such a parameter 
+  // - thus we can not consistently check if the ParentDC of such a parameter
   // is Dependent or/and a FunctionOrMethod.
-  // For e.g. this code, during Template argument deduction tries to 
+  // For e.g. this code, during Template argument deduction tries to
   // find an instantiated decl for (T y) when the ParentDC for y is
-  // the translation unit.  
-  //   e.g. template <class T> void Foo(auto (*p)(T y) -> decltype(y())) {} 
+  // the translation unit.
+  //   e.g. template <class T> void Foo(auto (*p)(T y) -> decltype(y())) {}
   //   float baz(float(*)()) { return 0.0; }
   //   Foo(baz);
   // The better fix here is perhaps to ensure that a ParmVarDecl, by the time
@@ -5186,10 +5192,20 @@ void Sema::PerformPendingInstantiations(bool LocalOnly) {
     if (FunctionDecl *Function = dyn_cast<FunctionDecl>(Inst.first)) {
       bool DefinitionRequired = Function->getTemplateSpecializationKind() ==
                                 TSK_ExplicitInstantiationDefinition;
-      InstantiateFunctionDefinition(/*FIXME:*/Inst.second, Function, true,
-                                    DefinitionRequired, true);
-      if (Function->isDefined())
-        Function->setInstantiationIsPending(false);
+      if (Function->isMultiVersion()) {
+        getASTContext().forEachMultiversionedFunctionVersion(
+            Function, [this, Inst, DefinitionRequired](FunctionDecl *CurFD) {
+              InstantiateFunctionDefinition(/*FIXME:*/ Inst.second, CurFD, true,
+                                            DefinitionRequired, true);
+              if (CurFD->isDefined())
+                CurFD->setInstantiationIsPending(false);
+            });
+      } else {
+        InstantiateFunctionDefinition(/*FIXME:*/ Inst.second, Function, true,
+                                      DefinitionRequired, true);
+        if (Function->isDefined())
+          Function->setInstantiationIsPending(false);
+      }
       continue;
     }
 

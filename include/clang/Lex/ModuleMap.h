@@ -69,7 +69,7 @@ public:
   virtual void moduleMapAddUmbrellaHeader(FileManager *FileMgr,
                                           const FileEntry *Header) {}
 };
-  
+
 class ModuleMap {
   SourceManager &SourceMgr;
   DiagnosticsEngine &Diags;
@@ -78,11 +78,11 @@ class ModuleMap {
   HeaderSearch &HeaderInfo;
 
   llvm::SmallVector<std::unique_ptr<ModuleMapCallbacks>, 1> Callbacks;
-  
+
   /// The directory used for Clang-supplied, builtin include headers,
   /// such as "stdint.h".
   const DirectoryEntry *BuiltinIncludeDir = nullptr;
-  
+
   /// Language options used to parse the module map itself.
   ///
   /// These are always simple C language options.
@@ -285,7 +285,7 @@ private:
   ///
   /// \returns The resolved export declaration, which will have a NULL pointer
   /// if the export could not be resolved.
-  Module::ExportDecl 
+  Module::ExportDecl
   resolveExport(Module *Mod, const Module::UnresolvedExportDecl &Unresolved,
                 bool Complain) const;
 
@@ -303,8 +303,15 @@ private:
   Module *resolveModuleId(const ModuleId &Id, Module *Mod, bool Complain) const;
 
   /// Add an unresolved header to a module.
+  ///
+  /// \param Mod The module in which we're adding the unresolved header
+  ///        directive.
+  /// \param Header The unresolved header directive.
+  /// \param NeedsFramework If Mod is not a framework but a missing header would
+  ///        be found in case Mod was, set it to true. False otherwise.
   void addUnresolvedHeader(Module *Mod,
-                           Module::UnresolvedHeaderDirective Header);
+                           Module::UnresolvedHeaderDirective Header,
+                           bool &NeedsFramework);
 
   /// Look up the given header directive to find an actual header file.
   ///
@@ -312,14 +319,22 @@ private:
   /// \param Header The header directive to resolve.
   /// \param RelativePathName Filled in with the relative path name from the
   ///        module to the resolved header.
+  /// \param NeedsFramework If M is not a framework but a missing header would
+  ///        be found in case M was, set it to true. False otherwise.
   /// \return The resolved file, if any.
   const FileEntry *findHeader(Module *M,
                               const Module::UnresolvedHeaderDirective &Header,
-                              SmallVectorImpl<char> &RelativePathName);
+                              SmallVectorImpl<char> &RelativePathName,
+                              bool &NeedsFramework);
 
   /// Resolve the given header directive.
-  void resolveHeader(Module *M,
-                     const Module::UnresolvedHeaderDirective &Header);
+  ///
+  /// \param M The module in which we're resolving the header directive.
+  /// \param Header The header directive to resolve.
+  /// \param NeedsFramework If M is not a framework but a missing header would
+  ///        be found in case M was, set it to true. False otherwise.
+  void resolveHeader(Module *M, const Module::UnresolvedHeaderDirective &Header,
+                     bool &NeedsFramework);
 
   /// Attempt to resolve the specified header directive as naming a builtin
   /// header.
@@ -479,13 +494,13 @@ public:
   /// using direct (qualified) name lookup.
   ///
   /// \param Name The name of the module to look up.
-  /// 
+  ///
   /// \param Context The module for which we will look for a submodule. If
   /// null, we will look for a top-level module.
   ///
   /// \returns The named submodule, if known; otherwose, returns null.
   Module *lookupModuleQualified(StringRef Name, Module *Context) const;
-  
+
   /// Find a new module or submodule, or create it if it does not already
   /// exist.
   ///
@@ -630,7 +645,7 @@ public:
   /// Marks this header as being excluded from the given module.
   void excludeHeader(Module *Mod, Module::Header Header);
 
-  /// Parse the given module map file, and record any modules we 
+  /// Parse the given module map file, and record any modules we
   /// encounter.
   ///
   /// \param File The file to be parsed.
@@ -657,13 +672,13 @@ public:
 
   /// Dump the contents of the module map, for debugging purposes.
   void dump();
-  
+
   using module_iterator = llvm::StringMap<Module *>::const_iterator;
 
   module_iterator module_begin() const { return Modules.begin(); }
   module_iterator module_end()   const { return Modules.end(); }
 };
-  
+
 } // namespace clang
 
 #endif // LLVM_CLANG_LEX_MODULEMAP_H
