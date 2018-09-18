@@ -2,6 +2,7 @@ set(LLVM_LINK_COMPONENTS
   Analysis
   BitReader
   BitWriter
+  IDLPasses
   Core
   Coroutines
   Coverage
