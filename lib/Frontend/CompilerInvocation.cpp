@@ -123,39 +123,14 @@ static unsigned getOptimizationLevel(ArgList &Args, InputKind IK,
   if (IK.getLanguage() == InputKind::OpenCL && !Args.hasArg(OPT_cl_opt_disable))
     DefaultOpt = 2;
 
-  if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
-    if (A->getOption().matches(options::OPT_O0))
-      return 0;
-
-    if (A->getOption().matches(options::OPT_Ofast))
-      return 3;
-
-    assert(A->getOption().matches(options::OPT_O));
-
-    StringRef S(A->getValue());
-    if (S == "s" || S == "z" || S.empty())
-      return 2;
-
-    if (S == "g")
-      return 1;
-
-    return getLastArgIntValue(Args, OPT_O, DefaultOpt, Diags);
-  }
-
-  return DefaultOpt;
+  // Return optimize for size Os
+  return 2;
 }
 
 static unsigned getOptimizationLevelSize(ArgList &Args) {
   if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
     if (A->getOption().matches(options::OPT_O)) {
-      switch (A->getValue()[0]) {
-      default:
-        return 0;
-      case 's':
-        return 1;
-      case 'z':
-        return 2;
-      }
+      return 1;
     }
   }
   return 0;
@@ -574,8 +549,7 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
     if (Val == ~0U)
       Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args)
                                                 << A->getValue();
-    else
-      Opts.setDebugInfo(static_cast<codegenoptions::DebugInfoKind>(Val));
+    // JW always set this, see below.
   }
   if (Arg *A = Args.getLastArg(OPT_debugger_tuning_EQ)) {
     unsigned Val = llvm::StringSwitch<unsigned>(A->getValue())
@@ -589,6 +563,8 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
     else
       Opts.setDebuggerTuning(static_cast<llvm::DebuggerKind>(Val));
   }
+  // JW alwyas set this to ling-tables-only
+  Opts.setDebugInfo(static_cast<codegenoptions::DebugInfoKind>(codegenoptions::DebugLineTablesOnly));
   Opts.DwarfVersion = getLastArgIntValue(Args, OPT_dwarf_version_EQ, 0, Diags);
   Opts.DebugColumnInfo = Args.hasArg(OPT_dwarf_column_info);
   Opts.EmitCodeView = Args.hasArg(OPT_gcodeview);
@@ -674,34 +650,21 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.NoEscapingBlockTailCalls =
       Args.hasArg(OPT_fno_escaping_block_tail_calls);
   Opts.FloatABI = Args.getLastArgValue(OPT_mfloat_abi);
-  Opts.LessPreciseFPMAD = Args.hasArg(OPT_cl_mad_enable) ||
-                          Args.hasArg(OPT_cl_unsafe_math_optimizations) ||
-                          Args.hasArg(OPT_cl_fast_relaxed_math);
+  // Always set ffast math
+  Opts.LessPreciseFPMAD = true;
   Opts.LimitFloatPrecision = Args.getLastArgValue(OPT_mlimit_float_precision);
-  Opts.NoInfsFPMath = (Args.hasArg(OPT_menable_no_infinities) ||
-                       Args.hasArg(OPT_cl_finite_math_only) ||
-                       Args.hasArg(OPT_cl_fast_relaxed_math));
-  Opts.NoNaNsFPMath = (Args.hasArg(OPT_menable_no_nans) ||
-                       Args.hasArg(OPT_cl_unsafe_math_optimizations) ||
-                       Args.hasArg(OPT_cl_finite_math_only) ||
-                       Args.hasArg(OPT_cl_fast_relaxed_math));
-  Opts.NoSignedZeros = (Args.hasArg(OPT_fno_signed_zeros) ||
-                        Args.hasArg(OPT_cl_no_signed_zeros) ||
-                        Args.hasArg(OPT_cl_unsafe_math_optimizations) ||
-                        Args.hasArg(OPT_cl_fast_relaxed_math));
-  Opts.Reassociate = Args.hasArg(OPT_mreassociate);
-  Opts.FlushDenorm = Args.hasArg(OPT_cl_denorms_are_zero) ||
-                     (Args.hasArg(OPT_fcuda_is_device) &&
-                      Args.hasArg(OPT_fcuda_flush_denormals_to_zero));
-  Opts.CorrectlyRoundedDivSqrt =
-      Args.hasArg(OPT_cl_fp32_correctly_rounded_divide_sqrt);
+  Opts.NoInfsFPMath = true;
+  Opts.NoNaNsFPMath = true;
+  Opts.NoSignedZeros = true;
+  Opts.Reassociate = true;
+  Opts.FlushDenorm = true;
+  Opts.CorrectlyRoundedDivSqrt = false;
   Opts.UniformWGSize =
       Args.hasArg(OPT_cl_uniform_work_group_size);
   Opts.Reciprocals = Args.getAllArgValues(OPT_mrecip_EQ);
-  Opts.ReciprocalMath = Args.hasArg(OPT_freciprocal_math);
-  Opts.NoTrappingMath = Args.hasArg(OPT_fno_trapping_math);
-  Opts.StrictFloatCastOverflow =
-      !Args.hasArg(OPT_fno_strict_float_cast_overflow);
+  Opts.ReciprocalMath = true;
+  Opts.NoTrappingMath = true;
+  Opts.StrictFloatCastOverflow = false;
 
   Opts.NoZeroInitializedInBSS = Args.hasArg(OPT_mno_zero_initialized_in_bss);
   Opts.NumRegisterParameters = getLastArgIntValue(Args, OPT_mregparm, 0, Diags);
@@ -722,9 +685,7 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.StrictReturn = !Args.hasArg(OPT_fno_strict_return);
   Opts.StrictVTablePointers = Args.hasArg(OPT_fstrict_vtable_pointers);
   Opts.ForceEmitVTables = Args.hasArg(OPT_fforce_emit_vtables);
-  Opts.UnsafeFPMath = Args.hasArg(OPT_menable_unsafe_fp_math) ||
-                      Args.hasArg(OPT_cl_unsafe_math_optimizations) ||
-                      Args.hasArg(OPT_cl_fast_relaxed_math);
+  Opts.UnsafeFPMath = true;
   Opts.UnwindTables = Args.hasArg(OPT_munwind_tables);
   Opts.RelocationModel = getRelocModel(Args, Diags);
   Opts.ThreadModel = Args.getLastArgValue(OPT_mthread_model, "posix");
@@ -778,8 +739,9 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
 
   Opts.MSVolatile = Args.hasArg(OPT_fms_volatile);
 
-  Opts.VectorizeLoop = Args.hasArg(OPT_vectorize_loops);
-  Opts.VectorizeSLP = Args.hasArg(OPT_vectorize_slp);
+  // Do not vectorize.
+  Opts.VectorizeLoop = false;
+  Opts.VectorizeSLP = false;
 
   Opts.PreferVectorWidth = Args.getLastArgValue(OPT_mprefer_vector_width_EQ);
 
@@ -1099,8 +1061,9 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
 
   // If the user requested a flag that requires source locations available in
   // the backend, make sure that the backend tracks source location information.
-  if (NeedLocTracking && Opts.getDebugInfo() == codegenoptions::NoDebugInfo)
-    Opts.setDebugInfo(codegenoptions::LocTrackingOnly);
+  // JW disable
+  /* if (NeedLocTracking && Opts.getDebugInfo() == codegenoptions::NoDebugInfo) */
+  /*   Opts.setDebugInfo(codegenoptions::LocTrackingOnly); */
 
   Opts.RewriteMapFiles = Args.getAllArgValues(OPT_frewrite_map_file);
 
@@ -2466,7 +2429,8 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.SpellChecking = !Args.hasArg(OPT_fno_spell_checking);
   Opts.NoBitFieldTypeAlign = Args.hasArg(OPT_fno_bitfield_type_align);
   Opts.SinglePrecisionConstants = Args.hasArg(OPT_cl_single_precision_constant);
-  Opts.FastRelaxedMath = Args.hasArg(OPT_cl_fast_relaxed_math);
+  // JW: Always set ffast math
+  Opts.FastRelaxedMath = true;
   Opts.HexagonQdsp6Compat = Args.hasArg(OPT_mqdsp6_compat);
   Opts.FakeAddressSpaceMap = Args.hasArg(OPT_ffake_address_space_map);
   Opts.ParseUnknownAnytype = Args.hasArg(OPT_funknown_anytype);
@@ -2682,14 +2646,10 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
     if (InlineArg->getOption().matches(options::OPT_fno_inline))
       Opts.NoInlineDefine = true;
 
-  Opts.FastMath = Args.hasArg(OPT_ffast_math) ||
-      Args.hasArg(OPT_cl_fast_relaxed_math);
-  Opts.FiniteMathOnly = Args.hasArg(OPT_ffinite_math_only) ||
-      Args.hasArg(OPT_cl_finite_math_only) ||
-      Args.hasArg(OPT_cl_fast_relaxed_math);
-  Opts.UnsafeFPMath = Args.hasArg(OPT_menable_unsafe_fp_math) ||
-                      Args.hasArg(OPT_cl_unsafe_math_optimizations) ||
-                      Args.hasArg(OPT_cl_fast_relaxed_math);
+  // JW: Always set ffast math
+  Opts.FastMath = true;
+  Opts.FiniteMathOnly = true;
+  Opts.UnsafeFPMath = true;
 
   if (Arg *A = Args.getLastArg(OPT_ffp_contract)) {
     StringRef Val = A->getValue();
