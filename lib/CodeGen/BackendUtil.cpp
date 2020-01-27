@@ -682,7 +682,7 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
   if (CodeGenOpts.hasProfileIRUse())
     PMBuilder.PGOInstrUse = CodeGenOpts.ProfileInstrumentUsePath;
 
-  if (true) PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+  if (CodeGenOpts.EnableIDL) PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
                                    addConstraintResearchPasses);
 
   if (!CodeGenOpts.SampleProfileFile.empty())
