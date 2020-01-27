@@ -6,4 +6,4 @@ execdir=$(dirname $0)
 
 idl_clang="$execdir/idlclang"
 
-exec $idl_clang "$@" || (exec $idl_clang "$@" --fno-idl)
+(timeout 300 $idl_clang "$@" && echo "****IDLClang Worked :)") || (echo "****IDLClang Failed.  Falling back to normal clang"; exec $idl_clang "$@" -fno-idl)
