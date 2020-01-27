@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <iostream>
 #include "clang/Frontend/CompilerInvocation.h"
 #include "TestModuleFileExtension.h"
 #include "clang/Basic/Builtins.h"
@@ -526,6 +527,9 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.DebugPassManager =
       Args.hasFlag(OPT_fdebug_pass_manager, OPT_fno_debug_pass_manager,
                    /* Default */ false);
+
+  // Enable IDL unless otherwise specified.
+  Opts.EnableIDL = !Args.hasArg(OPT_fno_idl);
 
   if (Arg *A = Args.getLastArg(OPT_fveclib)) {
     StringRef Name = A->getValue();
